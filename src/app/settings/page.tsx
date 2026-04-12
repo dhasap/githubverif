@@ -1,48 +1,76 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useStore } from "@/lib/store";
+import { useEffect, useState, useCallback } from "react";
+import { useStore, useCredits } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
-import { Key, AlertTriangle, Loader2, RefreshCw, LogOut } from "lucide-react";
+import { Key, AlertTriangle, Loader2, RefreshCw, LogOut, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
+import { useSoundSettings } from "@/lib/sound";
 
 export default function SettingsPage() {
-  const { apiKey, user, clearApiKey, revokeApiKey, fetchUser } = useStore();
+  const { apiKey, clearApiKey, revokeApiKey } = useStore();
   const router = useRouter();
   const [newApiKey, setNewApiKey] = useState("");
   const [isRevoking, setIsRevoking] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const { user, isLoading } = useCredits(apiKey);
+  const { getSoundEnabled, setSoundEnabled, playSuccess } = useSoundSettings();
+  const [soundEnabled, setSoundEnabledState] = useState(false);
+
   useEffect(() => {
     if (!apiKey) {
       router.push("/");
-      return;
     }
-    fetchUser();
-  }, [apiKey, router, fetchUser]);
+  }, [apiKey, router]);
 
-  const handleChangeKey = () => {
+  // Load sound preference
+  useEffect(() => {
+    setSoundEnabledState(getSoundEnabled());
+  }, [getSoundEnabled]);
+
+  const handleToggleSound = useCallback(() => {
+    const newValue = !soundEnabled;
+    setSoundEnabled(newValue);
+    setSoundEnabledState(newValue);
+    if (newValue) {
+      // Play test sound when enabling
+      setTimeout(() => playSuccess(), 100);
+      toast.success("Notification sound enabled");
+    } else {
+      toast.info("Notification sound disabled");
+    }
+  }, [soundEnabled, setSoundEnabled, playSuccess]);
+
+  const handleChangeKey = useCallback(async () => {
     if (!newApiKey.trim()) {
       toast.error("Please enter a new API key");
       return;
     }
-    clearApiKey();
-    useStore.getState().setApiKey(newApiKey.trim());
-    useStore
-      .getState()
-      .fetchUser()
-      .then(() => {
-        toast.success("API key updated successfully!");
-        setNewApiKey("");
-      })
-      .catch(() => {
-        toast.error("Invalid API key");
-        useStore.getState().clearApiKey();
-      });
-  };
+    const trimmedKey = newApiKey.trim();
 
-  const handleRevoke = async () => {
+    try {
+      // Validate the new key first before clearing the old one
+      const res = await fetch("/api/credits", {
+        headers: { Authorization: `Bearer ${trimmedKey}` },
+      });
+
+      if (!res.ok) {
+        throw new Error("Invalid API key");
+      }
+
+      // Key is valid, now switch
+      clearApiKey();
+      useStore.getState().setApiKey(trimmedKey);
+      toast.success("API key updated successfully!");
+      setNewApiKey("");
+    } catch {
+      toast.error("Invalid API key");
+    }
+  }, [newApiKey, clearApiKey]);
+
+  const handleRevoke = useCallback(async () => {
     setIsRevoking(true);
     try {
       await revokeApiKey();
@@ -54,13 +82,13 @@ export default function SettingsPage() {
       setIsRevoking(false);
       setShowConfirm(false);
     }
-  };
+  }, [revokeApiKey, router]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     clearApiKey();
     toast.success("Logged out");
     router.push("/");
-  };
+  }, [clearApiKey, router]);
 
   if (!apiKey) return null;
 
@@ -113,6 +141,43 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Sound Settings */}
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400">
+                {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  Notification Sound
+                </h2>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  Play sound when verification completes
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                {soundEnabled ? "Enabled" : "Disabled"}
+              </span>
+              <button
+                onClick={handleToggleSound}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  soundEnabled
+                    ? "bg-blue-600"
+                    : "bg-zinc-200 dark:bg-zinc-700"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    soundEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           {/* Current API Key Info */}
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -129,28 +194,35 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800">
-                <span className="text-sm text-zinc-500 dark:text-zinc-400">Key</span>
-                <code className="text-sm font-mono text-zinc-700 dark:text-zinc-300">
-                  {apiKey?.slice(0, 12)}...{apiKey?.slice(-4)}
-                </code>
+            {isLoading ? (
+              <div className="space-y-3">
+                <div className="h-8 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse" />
+                <div className="h-8 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse" />
               </div>
-              {user && (
-                <>
-                  <div className="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800">
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">User ID</span>
-                    <span className="text-sm text-zinc-700 dark:text-zinc-300">{user.user_id}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800">
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">Joined</span>
-                    <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                      {new Date(user.joined_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800">
+                  <span className="text-sm text-zinc-500 dark:text-zinc-400">Key</span>
+                  <code className="text-sm font-mono text-zinc-700 dark:text-zinc-300">
+                    {apiKey?.slice(0, 12)}...{apiKey?.slice(-4)}
+                  </code>
+                </div>
+                {user && (
+                  <>
+                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800">
+                      <span className="text-sm text-zinc-500 dark:text-zinc-400">User ID</span>
+                      <span className="text-sm text-zinc-700 dark:text-zinc-300">{user.user_id}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800">
+                      <span className="text-sm text-zinc-500 dark:text-zinc-400">Joined</span>
+                      <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                        {new Date(user.joined_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Revoke API Key */}

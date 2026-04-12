@@ -1,44 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export type Theme = "dark" | "light";
 
-export function useTheme() {
-  const [theme, setThemeState] = useState<Theme | null>(null);
+// Safe DOM operations
+function safeApplyTheme(theme: Theme) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  if (theme === "dark") {
+    root.classList.add("dark");
+  } else {
+    root.classList.remove("dark");
+  }
+}
 
+function safeSaveTheme(theme: Theme) {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem("devpack-theme", theme);
+}
+
+function safeLoadTheme(): Theme {
+  if (typeof localStorage === "undefined") return "light";
+  const saved = localStorage.getItem("devpack-theme") as Theme | null;
+  return saved || "light";
+}
+
+export function useTheme() {
+  const [theme, setThemeState] = useState<Theme>("light");
+  const [mounted, setMounted] = useState(false);
+
+  // Initialize theme on mount
   useEffect(() => {
-    // Load saved theme on mount
-    const saved = localStorage.getItem("devpack-theme") as Theme | null;
-    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initialTheme = saved || (systemDark ? "dark" : "light");
-    setThemeState(initialTheme);
-    applyTheme(initialTheme);
+    const savedTheme = safeLoadTheme();
+    setThemeState(savedTheme);
+    safeApplyTheme(savedTheme);
+    setMounted(true);
   }, []);
 
-  const applyTheme = (newTheme: Theme) => {
-    const root = document.documentElement;
-    if (newTheme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
+  // Apply theme when it changes (after mount)
+  useEffect(() => {
+    if (mounted) {
+      safeApplyTheme(theme);
+      safeSaveTheme(theme);
     }
-  };
+  }, [theme, mounted]);
 
-  const setTheme = (newTheme: Theme) => {
+  const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
-    applyTheme(newTheme);
-    localStorage.setItem("devpack-theme", newTheme);
-  };
+  }, []);
 
-  const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark";
-    setTheme(newTheme);
-  };
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+  }, []);
 
   return {
-    theme: theme ?? "light",
-    resolvedTheme: theme ?? "light",
+    theme,
+    resolvedTheme: theme,
+    mounted,
     setTheme,
     toggleTheme,
   };
@@ -47,6 +66,5 @@ export function useTheme() {
 export function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "light";
   const saved = localStorage.getItem("devpack-theme") as Theme | null;
-  if (saved) return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return saved || "light";
 }

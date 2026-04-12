@@ -1,24 +1,24 @@
 "use client";
 
 import { useEffect } from "react";
-import { useStore } from "@/lib/store";
+import { useStore, useCredits } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import CreditCard from "@/components/CreditCard";
-import { CheckCircle, Clock, AlertCircle, ArrowRight } from "lucide-react";
+import { BroadcastContainer } from "@/components/BroadcastNotification";
+import { CheckCircle, Clock, AlertCircle, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export default function DashboardPage() {
-  const { apiKey, user, fetchUser } = useStore();
+  const { apiKey } = useStore();
   const router = useRouter();
+  const { user, isLoading, error } = useCredits(apiKey);
 
   useEffect(() => {
     if (!apiKey) {
       router.push("/");
-      return;
     }
-    fetchUser();
-  }, [apiKey, router, fetchUser]);
+  }, [apiKey, router]);
 
   if (!apiKey) return null;
 
@@ -37,8 +37,22 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {/* Broadcast Notifications */}
+        <BroadcastContainer className="mb-6" />
+
         {/* Credit Stats */}
-        <CreditCard />
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CreditCardSkeleton />
+            <CreditCardSkeleton />
+          </div>
+        ) : error ? (
+          <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+            <p className="text-red-600 dark:text-red-400">{error.message}</p>
+          </div>
+        ) : (
+          <CreditCard user={user} />
+        )}
 
         {/* Quick Actions */}
         <div className="mt-8">
@@ -70,6 +84,21 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function CreditCardSkeleton() {
+  return (
+    <div className="p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 animate-pulse">
+      <div className="flex items-center justify-between mb-4">
+        <div className="w-10 h-10 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+        <div className="w-16 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800" />
+      </div>
+      <div className="space-y-2">
+        <div className="w-24 h-4 rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="w-16 h-8 rounded bg-zinc-200 dark:bg-zinc-800" />
+      </div>
     </div>
   );
 }

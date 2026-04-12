@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useStore } from "@/lib/store";
+import { useState, useCallback, memo } from "react";
+import { useStore, useCredits } from "@/lib/store";
 import { Key, Loader2, ArrowRight, Bot } from "lucide-react";
 import { toast } from "sonner";
 import MaintenanceNotice from "./MaintenanceNotice";
@@ -10,13 +10,14 @@ interface ApiKeyInputProps {
   onSuccess?: () => void;
 }
 
-export default function ApiKeyInput({ onSuccess }: ApiKeyInputProps) {
+const ApiKeyInput = memo(function ApiKeyInput({ onSuccess }: ApiKeyInputProps) {
   const [inputKey, setInputKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isMaintenance, setIsMaintenance] = useState(false);
-  const { setApiKey, fetchUser } = useStore();
+  const { setApiKey } = useStore();
+  const { mutate } = useCredits(inputKey || null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputKey.trim()) {
       toast.error("Please enter an API key");
@@ -28,13 +29,12 @@ export default function ApiKeyInput({ onSuccess }: ApiKeyInputProps) {
 
     try {
       setApiKey(inputKey.trim());
-      await fetchUser();
+      await mutate();
       toast.success("API key validated successfully!");
       onSuccess?.();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Invalid API key";
 
-      // Check if it's a maintenance/server error
       if (errorMsg.includes("530") || errorMsg.includes("1033") || errorMsg.includes("tunnel")) {
         setIsMaintenance(true);
         toast.error("Server sedang maintenance. Silakan coba lagi nanti.");
@@ -45,7 +45,7 @@ export default function ApiKeyInput({ onSuccess }: ApiKeyInputProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [inputKey, setApiKey, mutate, onSuccess]);
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -129,4 +129,6 @@ export default function ApiKeyInput({ onSuccess }: ApiKeyInputProps) {
       </div>
     </div>
   );
-}
+});
+
+export default ApiKeyInput;

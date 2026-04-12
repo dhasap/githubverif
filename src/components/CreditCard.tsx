@@ -1,11 +1,13 @@
 "use client";
 
-import { useStore } from "@/lib/store";
+import { UserCredits } from "@/lib/store";
 import { Coins, Wallet, Lock, TrendingUp, Calendar, Users } from "lucide-react";
 
-export default function CreditCard() {
-  const { user } = useStore();
+interface CreditCardProps {
+  user: UserCredits | null | undefined;
+}
 
+export default function CreditCard({ user }: CreditCardProps) {
   if (!user) return null;
 
   const stats = [

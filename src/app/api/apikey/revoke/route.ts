@@ -10,7 +10,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    console.log("Revoking API key...");
     const res = await fetch("http://api.ahsanlabs.online/api/apikey/revoke", {
       method: "POST",
       headers: { Authorization: authHeader },

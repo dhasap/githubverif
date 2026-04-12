@@ -1,5 +1,10 @@
+/**
+ * Optimized store with SWR for data fetching and caching
+ */
+
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import useSWR, { SWRConfiguration, mutate } from "swr";
 
 export interface UserCredits {
   user_id: number;
@@ -27,10 +32,103 @@ export interface Job {
   updated_at: string;
 }
 
+// SWR fetcher
+const fetcher = async ([url, apiKey]: [string, string | null]) => {
+  if (!apiKey) throw new Error("No API key");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+
+    if (res.status === 503 || err.maintenance) {
+      throw new Error(err.error || "Server sedang maintenance");
+    }
+
+    if (res.status === 401) {
+      throw new Error("Invalid API key");
+    }
+
+    throw new Error(err.error || err.details || "Request failed");
+  }
+
+  return res.json();
+};
+
+// SWR default config
+const swrConfig: SWRConfiguration = {
+  revalidateOnFocus: true,
+  revalidateOnReconnect: true,
+  dedupingInterval: 2000,
+  errorRetryCount: 3,
+};
+
+// --- Hooks for data fetching ---
+
+export function useCredits(apiKey: string | null) {
+  const { data, error, isLoading, mutate } = useSWR<UserCredits>(
+    apiKey ? ["/api/credits", apiKey] : null,
+    (args) => fetcher(args as [string, string | null]),
+    {
+      ...swrConfig,
+      refreshInterval: 30000, // Refresh every 30 seconds
+    }
+  );
+
+  return {
+    user: data,
+    error,
+    isLoading,
+    mutate,
+  };
+}
+
+export function useJobs(apiKey: string | null, limit = 10, offset = 0) {
+  const { data, error, isLoading, mutate } = useSWR<{ jobs: Job[]; count: number }>(
+    apiKey ? [`/api/jobs?limit=${limit}&offset=${offset}`, apiKey] : null,
+    (args) => fetcher(args as [string, string | null]),
+    swrConfig
+  );
+
+  return {
+    jobs: data?.jobs || [],
+    count: data?.count || 0,
+    error,
+    isLoading,
+    mutate,
+  };
+}
+
+export function useJob(apiKey: string | null, jobId: string | null) {
+  const { data, error, isLoading } = useSWR<Job>(
+    apiKey && jobId ? [`/api/job/${jobId}`, apiKey] : null,
+    (args) => fetcher(args as [string, string | null]),
+    {
+      ...swrConfig,
+      refreshInterval: (data) => {
+        // Stop polling if job is finalized
+        const finalizedStatuses = ["approved", "rejected", "failed", "timeout"];
+        if (data && finalizedStatuses.includes(data.status)) {
+          return 0;
+        }
+        return 3000; // Poll every 3 seconds
+      },
+    }
+  );
+
+  return {
+    job: data,
+    error,
+    isLoading,
+  };
+}
+
+// --- Main Store ---
+
 interface AppState {
   apiKey: string | null;
-  user: UserCredits | null;
-  isLoading: boolean;
   isMaintenance: boolean;
   setApiKey: (key: string) => void;
   clearApiKey: () => void;
@@ -51,8 +149,6 @@ export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       apiKey: null,
-      user: null,
-      isLoading: false,
       isMaintenance: false,
 
       setApiKey: (key: string) => {
@@ -60,7 +156,7 @@ export const useStore = create<AppState>()(
       },
 
       clearApiKey: () => {
-        set({ apiKey: null, user: null, isMaintenance: false });
+        set({ apiKey: null, isMaintenance: false });
       },
 
       fetchUser: async () => {
@@ -74,7 +170,6 @@ export const useStore = create<AppState>()(
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
 
-          // Check for maintenance mode
           if (res.status === 503 || err.maintenance) {
             set({ isMaintenance: true });
             throw new Error(err.error || "Server sedang maintenance. Silakan coba lagi dalam 1-2 jam.");
@@ -89,8 +184,6 @@ export const useStore = create<AppState>()(
         }
 
         set({ isMaintenance: false });
-        const data = await res.json();
-        set({ user: data });
       },
 
       fetchJobs: async (limit = 10, offset = 0) => {
@@ -133,11 +226,15 @@ export const useStore = create<AppState>()(
           const err = await res.json().catch(() => ({}));
 
           if (res.status === 503 || err.maintenance) {
+            set({ isMaintenance: true });
             throw new Error(err.error || "Server sedang maintenance");
           }
 
           throw new Error(err.error || err.message || "Verification failed");
         }
+
+        // Invalidate jobs cache after new submission
+        mutate(["/api/jobs?limit=10&offset=0", apiKey]);
 
         return await res.json();
       },
@@ -170,7 +267,7 @@ export const useStore = create<AppState>()(
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || "Failed to revoke API key");
         }
-        set({ apiKey: null, user: null });
+        set({ apiKey: null });
       },
     }),
     {

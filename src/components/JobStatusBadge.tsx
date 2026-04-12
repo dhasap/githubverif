@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 interface JobStatusBadgeProps {
   status: string;
 }
@@ -65,7 +67,8 @@ const statusConfig: Record<
   },
 };
 
-export default function JobStatusBadge({ status }: JobStatusBadgeProps) {
+// Memoized component to prevent re-renders when status doesn't change
+const JobStatusBadge = memo(function JobStatusBadge({ status }: JobStatusBadgeProps) {
   const config = statusConfig[status] || {
     bg: "bg-gray-100 dark:bg-gray-800",
     text: "text-gray-700 dark:text-gray-300",
@@ -79,4 +82,6 @@ export default function JobStatusBadge({ status }: JobStatusBadgeProps) {
       {config.label}
     </span>
   );
-}
+});
+
+export default JobStatusBadge;

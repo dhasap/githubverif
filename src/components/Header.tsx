@@ -1,12 +1,14 @@
 "use client";
 
-import { useStore } from "@/lib/store";
-import { Key, LogOut, Menu, Settings, User, X } from "lucide-react";
+import { useStore, useCredits } from "@/lib/store";
+import { isAdmin } from "@/lib/admin";
+import { LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, memo, useMemo } from "react";
 import { usePathname } from "next/navigation";
+import ThemeToggle from "./ThemeToggle";
 
-const navItems = [
+const baseNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: "🏠" },
   { href: "/verify", label: "Verify", icon: "✅" },
   { href: "/history", label: "History", icon: "📋" },
@@ -14,10 +16,26 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
-export default function Header() {
-  const { apiKey, clearApiKey, user } = useStore();
+const adminNavItem = { href: "/admin", label: "Admin", icon: "📊" };
+
+const Header = memo(function Header() {
+  const { apiKey, clearApiKey } = useStore();
+  const { user } = useCredits(apiKey);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+
+  // Filter nav items based on admin status
+  const navItems = useMemo(() => {
+    if (isAdmin(user)) {
+      // Insert admin item before settings
+      return [
+        ...baseNavItems.slice(0, -1),
+        adminNavItem,
+        baseNavItems[baseNavItems.length - 1],
+      ];
+    }
+    return baseNavItems;
+  }, [user]);
 
   const handleLogout = () => {
     clearApiKey();
@@ -57,7 +75,10 @@ export default function Header() {
         </nav>
 
         {/* Right Side */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
           {/* Credits Badge */}
           {user && (
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
@@ -113,4 +134,6 @@ export default function Header() {
       )}
     </header>
   );
-}
+});
+
+export default Header;
