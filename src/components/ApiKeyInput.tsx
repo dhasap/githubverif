@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useCallback, memo } from "react";
-import { useStore, useCredits } from "@/lib/store";
+import { useStore } from "@/lib/store";
+import { apiKeySchema } from "@/lib/validation";
 import { Key, Loader2, ArrowRight, Bot } from "lucide-react";
+import Image from "next/image";
 import { toast } from "sonner";
 import MaintenanceNotice from "./MaintenanceNotice";
 
@@ -14,13 +16,15 @@ const ApiKeyInput = memo(function ApiKeyInput({ onSuccess }: ApiKeyInputProps) {
   const [inputKey, setInputKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isMaintenance, setIsMaintenance] = useState(false);
-  const { setApiKey } = useStore();
-  const { mutate } = useCredits(inputKey || null);
+  const { setApiKey, fetchUser } = useStore();
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputKey.trim()) {
-      toast.error("Please enter an API key");
+    const trimmed = inputKey.trim();
+
+    const formatCheck = apiKeySchema.safeParse(trimmed);
+    if (!formatCheck.success) {
+      toast.error(formatCheck.error.issues[0]?.message || "Invalid API key format");
       return;
     }
 
@@ -28,8 +32,8 @@ const ApiKeyInput = memo(function ApiKeyInput({ onSuccess }: ApiKeyInputProps) {
     setIsMaintenance(false);
 
     try {
-      setApiKey(inputKey.trim());
-      await mutate();
+      setApiKey(trimmed);
+      await fetchUser();
       toast.success("API key validated successfully!");
       onSuccess?.();
     } catch (err) {
@@ -45,14 +49,18 @@ const ApiKeyInput = memo(function ApiKeyInput({ onSuccess }: ApiKeyInputProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [inputKey, setApiKey, mutate, onSuccess]);
+  }, [inputKey, setApiKey, fetchUser, onSuccess]);
 
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white mb-4">
-          <Key size={32} />
-        </div>
+        <Image
+          src="/logo.png"
+          alt="DevPack"
+          width={64}
+          height={64}
+          className="inline-block rounded-2xl mb-4"
+        />
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
           Welcome to DevPack
         </h1>

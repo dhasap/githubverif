@@ -4,11 +4,12 @@
 
 import { z } from "zod";
 
-// API Key validation
+// API Key validation — base64url-like format used by the backend
 export const apiKeySchema = z
   .string()
-  .min(1, "API key is required")
-  .max(256, "API key is too long");
+  .min(20, "API key is too short")
+  .max(256, "API key is too long")
+  .regex(/^[A-Za-z0-9_-]+$/, "Invalid API key format");
 
 // 2FA code validation (6 digits)
 export const otpSchema = z
