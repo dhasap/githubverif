@@ -4,7 +4,6 @@ import { useState, useCallback, memo } from "react";
 import { useStore } from "@/lib/store";
 import { apiKeySchema } from "@/lib/validation";
 import { Key, Loader2, ArrowRight, Bot } from "lucide-react";
-import Image from "next/image";
 import { toast } from "sonner";
 import MaintenanceNotice from "./MaintenanceNotice";
 
@@ -54,7 +53,7 @@ const ApiKeyInput = memo(function ApiKeyInput({ onSuccess }: ApiKeyInputProps) {
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="text-center mb-8">
-        <Image
+        <img
           src="/logo.png"
           alt="DevPack"
           width={64}

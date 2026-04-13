@@ -4,7 +4,6 @@ import { useStore, useCredits } from "@/lib/store";
 import { isAdmin } from "@/lib/admin";
 import { LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { useState, memo, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
@@ -50,7 +49,7 @@ const Header = memo(function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/dashboard" className="flex items-center gap-2">
-          <Image
+          <img
             src="/logo.png"
             alt="DevPack"
             width={32}
