@@ -81,7 +81,7 @@ const JobDetailModal = memo(function JobDetailModal({
 
       {/* Modal */}
       <div
-        className={`relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl transform transition-all duration-300 ${
+        className={`relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl transform transition-all duration-300 ${
           isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"
         }`}
       >
